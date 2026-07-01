@@ -14,3 +14,6 @@
 /sql/*
 !/sql/*.sql
 
+!/scripts/
+/scripts/*
+!/scripts/test-api.ps1

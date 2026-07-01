@@ -142,7 +142,7 @@ Content-Type: application/json
 }
 ```
 
-Correct credentials return `200 OK` with a JWT. Invalid credentials currently return `400 Bad Request` with:
+Correct credentials return `200 OK` with a JWT. Invalid credentials return `401 Unauthorized` with:
 
 ```json
 {
@@ -150,9 +150,33 @@ Correct credentials return `200 OK` with a JWT. Invalid credentials currently re
 }
 ```
 
-Changing invalid login responses to `401 Unauthorized` is planned with the JWT authentication filter milestone.
+Duplicate usernames and invalid request formats return `400 Bad Request`.
 
-## 6. Inspect Stored Data
+## 6. Run the API Smoke Test
+
+Keep MySQL and the backend running, then open another PowerShell terminal at the repository root:
+
+```powershell
+.\scripts\test-api.ps1
+```
+
+The script generates a unique username and verifies:
+
+```text
+registration       -> 200 and a JWT
+login              -> 200 and a JWT
+wrong password     -> 401
+duplicate username -> 400
+invalid input      -> 400
+```
+
+Successful output ends with:
+
+```text
+All API smoke tests passed.
+```
+
+## 7. Inspect Stored Data
 
 ```sql
 USE login_practice;
@@ -160,6 +184,36 @@ SELECT id, username, password_hash, created_at FROM app_users;
 ```
 
 The `password_hash` value should start with a BCrypt prefix such as `$2a$` or `$2b$`. The original password must never be stored.
+
+To inspect the exact user created by the smoke test, copy the generated username from the script output:
+
+```sql
+SELECT
+  id,
+  username,
+  LEFT(password_hash, 4) AS bcrypt_prefix,
+  LENGTH(password_hash) AS hash_length,
+  password_hash <> 'Test123!' AS not_plaintext
+FROM app_users
+WHERE username = 'paste_generated_username_here';
+```
+
+Expected properties:
+
+```text
+bcrypt_prefix is $2a$ or $2b$
+hash_length is 60
+not_plaintext is 1
+```
+
+## Testing Strategy
+
+This project uses two complementary test levels:
+
+1. `mvn test` runs fast JUnit/Mockito tests for authentication decisions and error mapping without requiring a running server.
+2. `scripts/test-api.ps1` treats the application as a black box and verifies real HTTP behavior against Spring Boot and MySQL.
+
+The database query is a final persistence check: it proves the user was stored and the password was hashed rather than saved as plaintext.
 
 ## API Flow
 
@@ -192,4 +246,3 @@ AuthController receives JSON
 - Add integration tests with a test database.
 - Add a minimal React login page.
 - Add GitHub Actions for automated tests.
-
