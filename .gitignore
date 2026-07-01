@@ -1,0 +1,16 @@
+# Publish only source code, database schema, and the reviewer README.
+*
+
+!/.gitignore
+!/README.md
+
+!/backend/
+/backend/*
+!/backend/pom.xml
+!/backend/src/
+!/backend/src/**
+
+!/sql/
+/sql/*
+!/sql/*.sql
+
