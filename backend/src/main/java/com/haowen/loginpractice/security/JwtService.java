@@ -1,5 +1,6 @@
 package com.haowen.loginpractice.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,5 +35,17 @@ public class JwtService {
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
                 .compact();
+    }
+
+    public AuthenticatedUser parseToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Long userId = Long.valueOf(claims.getSubject());
+        String username = claims.get("username", String.class);
+        return new AuthenticatedUser(userId, username);
     }
 }

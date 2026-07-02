@@ -14,10 +14,10 @@ HTTP request -> Controller -> Service -> Repository -> MySQL
 - Store a BCrypt password hash instead of plaintext.
 - Log in with username and password.
 - Return a signed JWT after successful registration or login.
+- Validate Bearer JWTs before allowing access to protected endpoints.
+- Return the authenticated user's identity from a protected profile endpoint.
 - Return a consistent JSON error for invalid credentials.
-- Unit tests for authentication logic and error handling.
-
-The project currently issues JWTs but does not yet validate them on protected endpoints. JWT request filtering and a protected endpoint are planned as the next milestone.
+- Unit tests for authentication logic, JWT verification, filtering, and error handling.
 
 ## Tech Stack
 
@@ -39,7 +39,8 @@ backend/
   src/main/java/com/haowen/loginpractice/
     auth/       # request DTOs, controller, service, responses
     common/     # API exception handling
-    security/   # BCrypt bean, security rules, JWT generation
+    profile/    # protected profile endpoint
+    security/   # BCrypt, security rules, JWT generation and validation
     user/       # JPA entity and repository
   src/main/resources/application.yml
   src/test/     # unit tests
@@ -152,6 +153,34 @@ Correct credentials return `200 OK` with a JWT. Invalid credentials return `401 
 
 Duplicate usernames and invalid request formats return `400 Bad Request`.
 
+### Protected Profile
+
+First copy the `token` returned by registration or login. Then send:
+
+```http
+GET http://localhost:8080/api/profile
+Authorization: Bearer eyJ...
+```
+
+In Postman, open the `Authorization` tab, select `Bearer Token`, and paste only the token value. Postman creates the `Authorization: Bearer <token>` header for you.
+
+A valid token returns:
+
+```json
+{
+  "userId": 1,
+  "username": "haowen"
+}
+```
+
+No token, an invalid signature, or an expired token returns `401 Unauthorized`:
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
 ## 6. Run the API Smoke Test
 
 Keep MySQL and the backend running, then open another PowerShell terminal at the repository root:
@@ -165,6 +194,9 @@ The script generates a unique username and verifies:
 ```text
 registration       -> 200 and a JWT
 login              -> 200 and a JWT
+profile, no JWT     -> 401
+profile, invalid JWT-> 401
+profile, valid JWT  -> 200 and the same user identity
 wrong password     -> 401
 duplicate username -> 400
 invalid input      -> 400
@@ -239,10 +271,22 @@ AuthController receives JSON
 -> AuthResponse is returned
 ```
 
+Protected request:
+
+```text
+Client sends Authorization: Bearer <JWT>
+-> JwtAuthenticationFilter extracts the token
+-> JwtService verifies the signature and expiration
+-> the filter stores AuthenticatedUser in Spring Security's SecurityContext
+-> Spring Security allows the request
+-> ProfileController reads the authenticated principal
+-> ProfileResponse is returned as JSON
+```
+
+The backend uses stateless authentication: it does not create a server-side login session. Every protected request must carry its JWT. This makes the API easier to scale horizontally, but the token must be protected and must expire.
+
 ## Roadmap
 
-- Validate Bearer JWTs with a Spring Security filter.
-- Add a protected profile endpoint.
 - Add integration tests with a test database.
 - Add a minimal React login page.
 - Add GitHub Actions for automated tests.
