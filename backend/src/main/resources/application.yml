@@ -17,6 +17,8 @@ spring:
         format_sql: true
 
 app:
+  cors:
+    allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
   jwt:
     secret: ${JWT_SECRET:change-this-secret-to-at-least-32-characters}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}

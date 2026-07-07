@@ -1,9 +1,9 @@
 # Spring Boot Authentication Practice
 
-A small authentication backend built to practice an end-to-end Java/Spring Boot request flow:
+A small full-stack application built to practice an end-to-end authentication flow:
 
 ```text
-HTTP request -> Controller -> Service -> Repository -> MySQL
+React form -> HTTP request -> Controller -> Service -> Repository -> MySQL
                                       -> BCrypt password hashing
                                       -> signed JWT response
 ```
@@ -16,6 +16,8 @@ HTTP request -> Controller -> Service -> Repository -> MySQL
 - Return a signed JWT after successful registration or login.
 - Validate Bearer JWTs before allowing access to protected endpoints.
 - Return the authenticated user's identity from a protected profile endpoint.
+- Register and log in through a React form.
+- Store the JWT in the browser and use it for the protected profile request.
 - Return a consistent JSON error for invalid credentials.
 - Unit tests for authentication logic, JWT verification, filtering, and error handling.
 
@@ -30,6 +32,9 @@ HTTP request -> Controller -> Service -> Repository -> MySQL
 - JJWT
 - Maven
 - JUnit 5 / Mockito
+- React 18
+- Vite 8
+- Vitest 4
 
 ## Project Structure
 
@@ -44,6 +49,11 @@ backend/
     user/       # JPA entity and repository
   src/main/resources/application.yml
   src/test/     # unit tests
+frontend/
+  src/
+    App.jsx      # form state, authentication flow, profile state
+    api.js       # HTTP requests and API error mapping
+    api.test.js  # frontend API contract tests
 sql/
   01_create_database_and_user_table.sql
 ```
@@ -56,9 +66,10 @@ Install and verify:
 java -version
 mvn -version
 mysql --version
+npm --version
 ```
 
-You need Java 17 or later, Maven, and a running MySQL 8 server on port `3306`.
+You need Java 17 or later, Maven, MySQL 8, Node.js, and npm. MySQL must run on port `3306`.
 
 ## 1. Create the Database
 
@@ -83,27 +94,54 @@ $env:DB_URL="jdbc:mysql://localhost:3306/login_practice?useSSL=false&allowPublic
 $env:DB_USERNAME="root"
 $env:DB_PASSWORD="your-mysql-password"
 $env:JWT_SECRET="replace-with-a-random-secret-that-is-at-least-32-characters"
+$env:FRONTEND_ORIGIN="http://localhost:5173"
 ```
 
 Do not commit real passwords or production secrets.
 
-## 3. Run Tests
+`FRONTEND_ORIGIN` is the browser origin allowed to call `/api/**`. This CORS rule does not replace authentication.
+
+## 3. Install Frontend Dependencies
+
+```powershell
+cd frontend
+npm install
+```
+
+## 4. Run Tests
 
 ```powershell
 cd backend
 mvn test
+
+cd ../frontend
+npm test
+npm run build
 ```
 
-## 4. Start the Backend
+## 5. Start the Application
+
+Terminal 1, backend:
 
 ```powershell
 cd backend
 mvn spring-boot:run
 ```
 
-The API starts at `http://localhost:8080`.
+Terminal 2, frontend:
 
-## 5. Verify with Postman
+```powershell
+cd frontend
+npm run dev
+```
+
+Open `http://localhost:5173`. The frontend calls `http://localhost:8080` by default.
+
+Use `Create account` to register. The backend stores a BCrypt hash in MySQL and returns a JWT. React stores that token in `localStorage`, sends it in the Bearer header to `/api/profile`, and displays the protected response. `Sign out` removes the token.
+
+This project uses `localStorage` to make the learning flow visible. Production systems must evaluate XSS risk and may choose secure, HttpOnly cookies depending on the architecture.
+
+## 6. Verify with Postman
 
 ### Register
 
@@ -181,7 +219,7 @@ No token, an invalid signature, or an expired token returns `401 Unauthorized`:
 }
 ```
 
-## 6. Run the API Smoke Test
+## 7. Run the API Smoke Test
 
 Keep MySQL and the backend running, then open another PowerShell terminal at the repository root:
 
@@ -208,7 +246,7 @@ Successful output ends with:
 All API smoke tests passed.
 ```
 
-## 7. Inspect Stored Data
+## 8. Inspect Stored Data
 
 ```sql
 USE login_practice;
@@ -240,10 +278,11 @@ not_plaintext is 1
 
 ## Testing Strategy
 
-This project uses two complementary test levels:
+This project uses three complementary test levels:
 
 1. `mvn test` runs fast JUnit/Mockito tests for authentication decisions and error mapping without requiring a running server.
-2. `scripts/test-api.ps1` treats the application as a black box and verifies real HTTP behavior against Spring Boot and MySQL.
+2. `npm test` verifies the frontend's request method, JSON body, Bearer header, and API error mapping.
+3. `scripts/test-api.ps1` treats the application as a black box and verifies real HTTP behavior against Spring Boot and MySQL.
 
 The database query is a final persistence check: it proves the user was stored and the password was hashed rather than saved as plaintext.
 
@@ -285,8 +324,20 @@ Client sends Authorization: Bearer <JWT>
 
 The backend uses stateless authentication: it does not create a server-side login session. Every protected request must carry its JWT. This makes the API easier to scale horizontally, but the token must be protected and must expire.
 
+Browser flow:
+
+```text
+User submits the React form
+-> App.jsx calls login() or register()
+-> api.js sends a POST request with a JSON body
+-> the backend returns userId, username, and JWT
+-> React stores the JWT and updates component state
+-> useEffect calls getProfile() when the token changes
+-> api.js adds Authorization: Bearer <JWT>
+-> the protected profile response updates the UI
+```
+
 ## Roadmap
 
 - Add integration tests with a test database.
-- Add a minimal React login page.
 - Add GitHub Actions for automated tests.
